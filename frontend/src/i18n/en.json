@@ -1,0 +1,8 @@
+{
+  "app_title": "Agro-Resilience Agent",
+  "welcome_message": "Namaste! How can I assist you with your farming today?",
+  "input_placeholder": "Ask about crops, weather, or pests...",
+  "send_button": "Send",
+  "location_label": "Location",
+  "weather_loading": "Checking satellites..."
+}
