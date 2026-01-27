@@ -1,11 +1,13 @@
 import { useState, useRef } from 'react';
 import axios from 'axios';
 
+const API_BASE = process.env.REACT_APP_BACKEND_URL;
+
 const useChat = () => {
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(false);
     
-    // NEW: Ref to persist sessionId across renders without triggering re-renders
+    // Ref to persist sessionId across renders
     const sessionIdRef = useRef(null);
 
     const sendMessage = async (input, location, language) => {
@@ -13,19 +15,17 @@ const useChat = () => {
 
         const userMessage = { sender: 'user', text: input };
         setMessages((prev) => [...prev, userMessage]);
-        
         setLoading(true);
 
         try {
-            // POST request now includes sessionId
-            const response = await axios.post('http://localhost:5000/api/chat', {
+            const response = await axios.post(`${API_BASE}/api/chat`, {
                 message: input,
                 location: location,
                 language: language,
-                sessionId: sessionIdRef.current // Send existing ID if we have one
+                sessionId: sessionIdRef.current
             });
 
-            // Save the Session ID returned by the backend (for the first turn)
+            // Persist sessionId returned by backend
             if (response.data.sessionId) {
                 sessionIdRef.current = response.data.sessionId;
             }
@@ -35,10 +35,15 @@ const useChat = () => {
 
         } catch (error) {
             console.error("Chat Error:", error);
-            setMessages((prev) => [...prev, { 
-                sender: 'bot', 
-                text: language === 'hi' ? 'सर्वर से संपर्क नहीं हो पा रहा है।' : 'Sorry, connection error.' 
-            }]);
+            setMessages((prev) => [
+                ...prev,
+                {
+                    sender: 'bot',
+                    text: language === 'hi'
+                        ? 'सर्वर से संपर्क नहीं हो पा रहा है।'
+                        : 'Sorry, connection error.'
+                }
+            ]);
         } finally {
             setLoading(false);
         }
