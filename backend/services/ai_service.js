@@ -4,8 +4,8 @@ require("dotenv").config();
 
 /**
  * 🧠 AGRO-INTELLIGENCE ENGINE (IBM WatsonX Granite Edition)
- * SAFETY UPGRADE v2.2
- * FIX: Corrected SDK Instantiation & Method Call
+ * SAFETY UPGRADE v2.3
+ * FIX: Corrected SDK Instantiation & Added Stop Sequences
  */
 
 // ------------------------------------------------------------------
@@ -151,15 +151,15 @@ const generateAiResponse = async (
 
   try {
     // 4️⃣ IBM WatsonX – CORRECTED CALL
-    // We use .generateText() on the initialized service instance
     const response = await watsonxAiService.generateText({
       modelId: "ibm/granite-3-8b-instruct",
       projectId: process.env.WATSONX_AI_PROJECT_ID,
       input: finalPrompt,
       parameters: {
         decoding_method: 'greedy',
-        temperature: 0.1,
-        max_new_tokens: 900
+        temperature: 0.2,
+        max_new_tokens: 500, // Reduced to prevent long rants
+        stop_sequences: ["User:", "Assistant:"] // <--- CRITICAL FIX: STOPS LOOPING
       }
     });
 
