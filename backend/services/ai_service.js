@@ -3,9 +3,9 @@ const { buildSystemPrompt } = require("./prompt_builder");
 require("dotenv").config();
 
 /**
- * 🧠 AGRO-INTELLIGENCE ENGINE
- * IBM WatsonX Granite – Production Stable (No LangChain Runtime)
- * SAFETY UPGRADE: v2.0 (Pre & Post Computation Gates)
+ * 🧠 AGRO-INTELLIGENCE ENGINE (IBM WatsonX Granite Edition)
+ * SAFETY UPGRADE v2.0
+ * NOTE: LangChain runtime removed (IBM SDK incompatibility)
  */
 
 // ------------------------------------------------------------------
@@ -14,12 +14,12 @@ require("dotenv").config();
 
 /**
  * FR-A1: Pre-LLM Risk Gate
- * Blocks high-risk animal medical dosage & self-harm queries
+ * Blocks high-risk animal medicine & self-harm queries
  */
 const preCheckRisk = (input) => {
   const text = input.toLowerCase();
 
-  // 1️⃣ Animal Medical Dosage Block
+  // 1️⃣ Animal medical dosage block
   const animalKeywords = [
     "cow", "buffalo", "goat", "sheep",
     "chicken", "poultry", "animal",
@@ -41,16 +41,16 @@ const preCheckRisk = (input) => {
       reason: "ANIMAL_MED_RISK",
       safeResponse:
         "I cannot provide specific medical dosages or injection instructions for animals. " +
-        "This can be dangerous if calculated incorrectly.\n\n" +
+        "This can be fatal if calculated incorrectly.\n\n" +
         "**Please consult a Veterinary Doctor immediately.**\n\n" +
-        "I can still help with:\n" +
+        "However, I can help with:\n" +
         "1. Supportive care (diet & hygiene)\n" +
         "2. Isolation protocols\n" +
-        "3. Symptom identification"
+        "3. Identifying symptoms"
     };
   }
 
-  // 2️⃣ Suicide / Self-harm escalation
+  // 2️⃣ Suicide / self-harm escalation
   const harmKeywords = [
     "suicide", "kill myself", "die",
     "end my life", "drink poison"
@@ -61,8 +61,8 @@ const preCheckRisk = (input) => {
       blocked: true,
       reason: "HARM_RISK",
       safeResponse:
-        "I hear deep distress in your words.\n\n" +
-        "📞 **Call Kiran Mental Health Helpline: 1800-599-0019**\n" +
+        "I am hearing great distress in your words.\n\n" +
+        "📞 **Call the Government Helpline: 1800-599-0019** (Kiran Mental Health) " +
         "or dial **112** immediately.\n\n" +
         "Your life is more valuable than any crop or loan."
     };
@@ -73,7 +73,7 @@ const preCheckRisk = (input) => {
 
 /**
  * FR-A2: Post-LLM Output Validator
- * Prevents unsafe dosages & antibiotics in AI output
+ * Blocks specific dosages & antibiotics
  */
 const validateAiOutput = (text) => {
   const clean = text.toLowerCase();
@@ -89,9 +89,9 @@ const validateAiOutput = (text) => {
     return {
       safe: false,
       fallback:
-        "I can explain the condition, but I cannot prescribe exact chemical dosages " +
-        "or antibiotics.\n\n" +
-        "✅ Please consult a Veterinarian or Krishi Kendra officer for region-specific treatment."
+        "I have identified the condition, but I am restricted from prescribing " +
+        "specific chemical dosages or antibiotics to ensure safety.\n\n" +
+        "✅ Please consult a Veterinarian or Krishi Kendra officer for exact treatment."
     };
   }
 
@@ -116,7 +116,7 @@ const generateAiResponse = async (
     return riskCheck.safeResponse;
   }
 
-  // 2️⃣ Crisis Detection (persona shaping)
+  // 2️⃣ Crisis detection (persona shaping)
   const crisisKeywords = [
     "ruin", "died", "suicide",
     "debt", "emergency",
@@ -126,7 +126,7 @@ const generateAiResponse = async (
     userPrompt.toLowerCase().includes(w)
   );
 
-  // 3️⃣ Build System Prompt (UNCHANGED LOGIC)
+  // 3️⃣ Build system persona (UNCHANGED)
   const systemInstruction = buildSystemPrompt(
     context,
     isCrisis,
@@ -142,7 +142,7 @@ const generateAiResponse = async (
   console.log(`🤖 AI Request: "${userPrompt}" [Turn ${turnCount}]`);
 
   try {
-    // 4️⃣ IBM WatsonX – Correct SDK Call (NO CONSTRUCTORS)
+    // 4️⃣ IBM WatsonX – ONLY supported call shape
     const response = await watsonxAi.textGeneration({
       modelId: "ibm/granite-3-8b-instruct",
       projectId: process.env.WATSONX_AI_PROJECT_ID,
@@ -151,31 +151,25 @@ const generateAiResponse = async (
         temperature: 0.1,
         max_new_tokens: 900
       },
-      credentials: {
-        apiKey: process.env.WATSONX_AI_APIKEY,
-        serviceUrl: process.env.WATSONX_AI_SERVICE_URL
-      }
+      apiKey: process.env.WATSONX_AI_APIKEY,
+      serviceUrl: process.env.WATSONX_AI_SERVICE_URL
     });
 
-    const rawText =
+    const text =
       response?.results?.[0]?.generated_text?.trim();
 
-    if (!rawText) {
+    if (!text) {
       throw new Error("Empty response from WatsonX");
     }
 
     // 5️⃣ POST-COMPUTATION SAFETY VALIDATOR
-    const validation = validateAiOutput(rawText);
+    const validation = validateAiOutput(text);
     if (!validation.safe) {
       console.warn("⚠️ [Safety Validator] Output blocked");
       return validation.fallback;
     }
 
-    if (rawText.length < 5) {
-      return "I received your query, but could you please provide a bit more detail?";
-    }
-
-    return rawText;
+    return text;
 
   } catch (error) {
     console.error("🔴 [AI Service Error]:", error.message);
