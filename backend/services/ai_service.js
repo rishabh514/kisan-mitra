@@ -1,4 +1,4 @@
-const { ChatWatsonx } = require("@langchain/community/chat_models/watsonx");
+const { WatsonxAI } = require("@ibm-cloud/watsonx-ai");
 const { ChatPromptTemplate } = require("@langchain/core/prompts");
 const { StringOutputParser } = require("@langchain/core/output_parsers");
 const { buildSystemPrompt } = require('./prompt_builder'); 
@@ -82,14 +82,26 @@ const generateAiResponse = async (userPrompt, context = "", history = "", turnCo
   }
 
   // 2. Initialize IBM Granite via LangChain
-  const model = new ChatWatsonx({
-    model: "ibm/granite-3-8b-instruct", 
-    serviceUrl: process.env.WATSONX_AI_SERVICE_URL,
-    projectId: process.env.WATSONX_AI_PROJECT_ID,
-    version: "2024-05-31",
-    temperature: 0.1, // Reduced temperature for determinism
-    maxTokens: 900,
+const watsonx = new WatsonxAI({
+  authType: "iam",
+  apiKey: process.env.WATSONX_AI_APIKEY,
+  serviceUrl: process.env.WATSONX_AI_SERVICE_URL,
+  projectId: process.env.WATSONX_AI_PROJECT_ID,
+});
+
+const generate = async (prompt) => {
+  const response = await watsonx.textGeneration({
+    modelId: "ibm/granite-3-8b-instruct",
+    input: prompt,
+    parameters: {
+      temperature: 0.1,
+      max_new_tokens: 900,
+    },
   });
+
+  return response.results[0].generated_text;
+};
+
 
   // 3. Detect Crisis (Contextual) - Kept for System Prompt logic
   const crisisKeywords = ['ruin', 'died', 'suicide', 'debt', 'emergency', 'help', 'loss', 'failed', 'destroy'];
