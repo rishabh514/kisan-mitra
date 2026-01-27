@@ -1,26 +1,35 @@
-const { IamAuthenticator } = require("ibm-cloud-sdk-core");
-const { TextGenerationService } = require("@ibm-cloud/watsonx-ai");
+const watsonxAi = require("@ibm-cloud/watsonx-ai");
 const { buildSystemPrompt } = require("./prompt_builder");
 require("dotenv").config();
 
 /**
  * 🧠 AGRO-INTELLIGENCE ENGINE
- * IBM WatsonX (Granite) – Production Safe Version
- * Safety Gates + Validators enabled
+ * IBM WatsonX Granite – Production Stable (No LangChain Runtime)
+ * SAFETY UPGRADE: v2.0 (Pre & Post Computation Gates)
  */
 
-// ---------------- SAFETY UTILITIES ----------------
+// ------------------------------------------------------------------
+// SAFETY UTILITIES
+// ------------------------------------------------------------------
 
+/**
+ * FR-A1: Pre-LLM Risk Gate
+ * Blocks high-risk animal medical dosage & self-harm queries
+ */
 const preCheckRisk = (input) => {
   const text = input.toLowerCase();
 
+  // 1️⃣ Animal Medical Dosage Block
   const animalKeywords = [
-    "cow", "buffalo", "goat", "sheep", "chicken",
-    "poultry", "animal", "cattle", "calf"
+    "cow", "buffalo", "goat", "sheep",
+    "chicken", "poultry", "animal",
+    "cattle", "calf"
   ];
   const medKeywords = [
-    "dose", "dosage", "injection", "medicine",
-    "antibiotic", "paracetamol", "inject", "mg", "ml"
+    "dose", "dosage", "injection",
+    "medicine", "antibiotic",
+    "paracetamol", "inject",
+    "mg", "ml"
   ];
 
   const hasAnimal = animalKeywords.some(w => text.includes(w));
@@ -32,15 +41,16 @@ const preCheckRisk = (input) => {
       reason: "ANIMAL_MED_RISK",
       safeResponse:
         "I cannot provide specific medical dosages or injection instructions for animals. " +
-        "This can be fatal if calculated incorrectly.\n\n" +
+        "This can be dangerous if calculated incorrectly.\n\n" +
         "**Please consult a Veterinary Doctor immediately.**\n\n" +
         "I can still help with:\n" +
-        "1. Supportive care\n" +
-        "2. Hygiene & isolation\n" +
+        "1. Supportive care (diet & hygiene)\n" +
+        "2. Isolation protocols\n" +
         "3. Symptom identification"
     };
   }
 
+  // 2️⃣ Suicide / Self-harm escalation
   const harmKeywords = [
     "suicide", "kill myself", "die",
     "end my life", "drink poison"
@@ -61,10 +71,14 @@ const preCheckRisk = (input) => {
   return { blocked: false };
 };
 
+/**
+ * FR-A2: Post-LLM Output Validator
+ * Prevents unsafe dosages & antibiotics in AI output
+ */
 const validateAiOutput = (text) => {
   const clean = text.toLowerCase();
 
-  const dosagePattern = /\d+\s*(mg|ml|gm|gram|liter|cc|iu)/i;
+  const dosagePattern = /\d+\s*(\.|,)?\d*\s*(mg|ml|gm|gram|liter|cc|iu)/i;
   const bannedMeds = [
     "amoxicillin", "ciprofloxacin",
     "azithromycin", "tamiflu",
@@ -75,25 +89,18 @@ const validateAiOutput = (text) => {
     return {
       safe: false,
       fallback:
-        "I can help explain the condition, but I cannot prescribe exact chemical dosages " +
+        "I can explain the condition, but I cannot prescribe exact chemical dosages " +
         "or antibiotics.\n\n" +
-        "✅ Please consult a Veterinarian or Krishi Kendra for region-specific treatment."
+        "✅ Please consult a Veterinarian or Krishi Kendra officer for region-specific treatment."
     };
   }
 
   return { safe: true };
 };
 
-// ---------------- WATSONX CLIENT ----------------
-
-const watsonx = new TextGenerationService({
-  authenticator: new IamAuthenticator({
-    apikey: process.env.WATSONX_AI_APIKEY,
-  }),
-  serviceUrl: process.env.WATSONX_AI_SERVICE_URL,
-});
-
-// ---------------- MAIN GENERATOR ----------------
+// ------------------------------------------------------------------
+// MAIN AI GENERATOR
+// ------------------------------------------------------------------
 
 const generateAiResponse = async (
   userPrompt,
@@ -102,24 +109,24 @@ const generateAiResponse = async (
   turnCount = 0
 ) => {
 
-  // 1️⃣ PRE-SAFETY GATE
+  // 1️⃣ PRE-COMPUTATION SAFETY GATE
   const riskCheck = preCheckRisk(userPrompt);
   if (riskCheck.blocked) {
-    console.log(`🛡️ Safety Gate Triggered: ${riskCheck.reason}`);
+    console.log(`🛡️ [Safety Gate] ${riskCheck.reason}`);
     return riskCheck.safeResponse;
   }
 
-  // 2️⃣ CRISIS CONTEXT
+  // 2️⃣ Crisis Detection (persona shaping)
   const crisisKeywords = [
     "ruin", "died", "suicide",
-    "debt", "emergency", "loss",
-    "failed", "destroy"
+    "debt", "emergency",
+    "loss", "failed", "destroy"
   ];
   const isCrisis = crisisKeywords.some(w =>
     userPrompt.toLowerCase().includes(w)
   );
 
-  // 3️⃣ SYSTEM PROMPT
+  // 3️⃣ Build System Prompt (UNCHANGED LOGIC)
   const systemInstruction = buildSystemPrompt(
     context,
     isCrisis,
@@ -128,41 +135,51 @@ const generateAiResponse = async (
   );
 
   const finalPrompt =
-    `${systemInstruction}\n\nUser: ${userPrompt}\nAssistant:`;
+    `${systemInstruction}\n\n` +
+    `User: ${userPrompt}\n` +
+    `Assistant:`;
 
-  console.log(`🤖 AI Request: "${userPrompt}"`);
+  console.log(`🤖 AI Request: "${userPrompt}" [Turn ${turnCount}]`);
 
   try {
-    // 4️⃣ CALL WATSONX
-    const response = await watsonx.generateText({
+    // 4️⃣ IBM WatsonX – Correct SDK Call (NO CONSTRUCTORS)
+    const response = await watsonxAi.textGeneration({
       modelId: "ibm/granite-3-8b-instruct",
+      projectId: process.env.WATSONX_AI_PROJECT_ID,
       input: finalPrompt,
       parameters: {
         temperature: 0.1,
-        max_new_tokens: 900,
+        max_new_tokens: 900
       },
-      projectId: process.env.WATSONX_AI_PROJECT_ID,
+      credentials: {
+        apiKey: process.env.WATSONX_AI_APIKEY,
+        serviceUrl: process.env.WATSONX_AI_SERVICE_URL
+      }
     });
 
-    const text =
-      response?.result?.results?.[0]?.generated_text?.trim();
+    const rawText =
+      response?.results?.[0]?.generated_text?.trim();
 
-    if (!text) {
+    if (!rawText) {
       throw new Error("Empty response from WatsonX");
     }
 
-    // 5️⃣ POST-VALIDATION
-    const validation = validateAiOutput(text);
+    // 5️⃣ POST-COMPUTATION SAFETY VALIDATOR
+    const validation = validateAiOutput(rawText);
     if (!validation.safe) {
-      console.warn("⚠️ Output safety violation detected");
+      console.warn("⚠️ [Safety Validator] Output blocked");
       return validation.fallback;
     }
 
-    return text;
+    if (rawText.length < 5) {
+      return "I received your query, but could you please provide a bit more detail?";
+    }
+
+    return rawText;
 
   } catch (error) {
-    console.error("🔴 AI Service Error:", error.message);
-    return "I am currently unable to access the agricultural knowledge system. Please try again shortly.";
+    console.error("🔴 [AI Service Error]:", error.message);
+    return "Namaste. I am temporarily unable to access the agricultural knowledge system. Please try again shortly.";
   }
 };
 
