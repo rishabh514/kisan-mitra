@@ -1,4 +1,4 @@
-const { ChatWatsonx } = require("@langchain/community/chat_models/ibm");
+const { ChatWatsonx } = require("@langchain/community/chat_models/watsonx");
 const { ChatPromptTemplate } = require("@langchain/core/prompts");
 const { StringOutputParser } = require("@langchain/core/output_parsers");
 const { buildSystemPrompt } = require('./prompt_builder'); 
