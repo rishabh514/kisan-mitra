@@ -7,7 +7,6 @@ const { generateAiResponse } = require('./services/ai_service');
 const { getLocalContext } = require('./services/rag_engine');
 const { getWeather } = require('./services/weather_service');
 const { translateText } = require('./services/translator');
-const { analyzeCropImage } = require('./services/vision_service'); 
 const { getSession, addTurn, getFormattedHistory, getTurnCount } = require('./services/session_manager');
 
 const app = express();
