@@ -1,12 +1,20 @@
-const watsonxAi = require("@ibm-cloud/watsonx-ai");
+const { WatsonXAI } = require("@ibm-cloud/watsonx-ai");
 const { buildSystemPrompt } = require("./prompt_builder");
 require("dotenv").config();
 
 /**
  * 🧠 AGRO-INTELLIGENCE ENGINE (IBM WatsonX Granite Edition)
- * SAFETY UPGRADE v2.0
- * NOTE: LangChain runtime removed (IBM SDK incompatibility)
+ * SAFETY UPGRADE v2.2
+ * FIX: Corrected SDK Instantiation & Method Call
  */
+
+// ------------------------------------------------------------------
+// 1. INITIALIZE WATSONX SERVICE CORRECTLY
+// ------------------------------------------------------------------
+const watsonxAiService = WatsonXAI.newInstance({
+    version: '2024-05-31',
+    serviceUrl: process.env.WATSONX_AI_SERVICE_URL,
+});
 
 // ------------------------------------------------------------------
 // SAFETY UTILITIES
@@ -126,7 +134,7 @@ const generateAiResponse = async (
     userPrompt.toLowerCase().includes(w)
   );
 
-  // 3️⃣ Build system persona (UNCHANGED)
+  // 3️⃣ Build system persona
   const systemInstruction = buildSystemPrompt(
     context,
     isCrisis,
@@ -142,27 +150,27 @@ const generateAiResponse = async (
   console.log(`🤖 AI Request: "${userPrompt}" [Turn ${turnCount}]`);
 
   try {
-    // 4️⃣ IBM WatsonX – ONLY supported call shape
-    const response = await watsonxAi.textGeneration({
+    // 4️⃣ IBM WatsonX – CORRECTED CALL
+    // We use .generateText() on the initialized service instance
+    const response = await watsonxAiService.generateText({
       modelId: "ibm/granite-3-8b-instruct",
       projectId: process.env.WATSONX_AI_PROJECT_ID,
       input: finalPrompt,
       parameters: {
+        decoding_method: 'greedy',
         temperature: 0.1,
         max_new_tokens: 900
-      },
-      apiKey: process.env.WATSONX_AI_APIKEY,
-      serviceUrl: process.env.WATSONX_AI_SERVICE_URL
+      }
     });
 
-    const text =
-      response?.results?.[0]?.generated_text?.trim();
+    // 5️⃣ Extract text safely
+    const text = response?.result?.results?.[0]?.generated_text?.trim();
 
     if (!text) {
       throw new Error("Empty response from WatsonX");
     }
 
-    // 5️⃣ POST-COMPUTATION SAFETY VALIDATOR
+    // 6️⃣ POST-COMPUTATION SAFETY VALIDATOR
     const validation = validateAiOutput(text);
     if (!validation.safe) {
       console.warn("⚠️ [Safety Validator] Output blocked");
@@ -173,6 +181,7 @@ const generateAiResponse = async (
 
   } catch (error) {
     console.error("🔴 [AI Service Error]:", error.message);
+    if (error.body) console.error("Details:", error.body); 
     return "Namaste. I am temporarily unable to access the agricultural knowledge system. Please try again shortly.";
   }
 };
