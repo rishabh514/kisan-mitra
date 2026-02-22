@@ -205,9 +205,3 @@ This project is developed as part of the **1M1B (1 Million for 1 Billion)** init
 
 
 
-* Tighten this further for **hackathon submission**
-* Rewrite it for **internship / recruiter evaluation**
-* Create a **short GitHub description + topics**
-* Add a **system architecture diagram (text-only)**
-
-Just tell me 🔥
